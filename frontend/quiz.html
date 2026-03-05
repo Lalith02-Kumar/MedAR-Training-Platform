@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post-Op Knowledge Quiz - MedAR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .quiz-container {
+            max-width: 800px;
+            margin: 40px auto;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: var(--glass-border);
+            border-radius: 4px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .option-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 18px 25px;
+            margin-bottom: 15px;
+            background: var(--surface);
+            border: 2px solid var(--glass-border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .option-btn:hover {
+            border-color: var(--primary);
+            background: rgba(154, 228, 203, 0.05);
+            transform: translateX(5px);
+        }
+
+        .option-btn.selected {
+            border-color: var(--primary);
+            background: rgba(154, 228, 203, 0.1);
+            box-shadow: 0 0 15px rgba(154, 228, 203, 0.2);
+        }
+
+        .option-btn.correct {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .option-btn.wrong {
+            border-color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        #timer {
+            font-size: 1.5rem;
+            font-family: var(--font-heading);
+            font-weight: bold;
+            color: var(--warning);
+        }
+
+        .explanation {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--primary);
+            border-radius: 0 8px 8px 0;
+            display: none;
+            font-size: 1.05rem;
+        }
+
+        #btn-prev {
+            transition: all 0.3s ease;
+        }
+
+        #btn-prev:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(154, 228, 203, 0.23);
+            border-color: var(--primary) !important;
+            color: var(--primary) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar glass-panel">
+        <div class="container d-flex justify-between align-center">
+            <a href="student-dashboard.html" class="nav-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Abort Quiz
+            </a>
+            <div id="timer">10:00</div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="glass-card quiz-container animate-fade-in" id="quiz-ui">
+            <div class="d-flex justify-between align-center" style="margin-bottom: 15px;">
+                <span id="question-counter" class="text-secondary" style="font-weight: 600;">Question 1 / 10</span>
+                <span class="badge badge-advanced">Knowledge Validation</span>
+            </div>
+
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+
+            <h2 id="question-text" style="font-size: 1.8rem; margin-bottom: 30px; line-height: 1.4;">Loading
+                questions...</h2>
+
+            <div id="options-container">
+                <!-- Buttons rendered here -->
+            </div>
+
+            <div class="d-flex justify-between" style="margin-top: auto; padding-top: 20px;">
+                <button id="btn-prev" class="btn btn-outline"
+                    style="padding: 12px 35px; display: none; border-color: var(--glass-border); color: var(--text-secondary);"
+                    onclick="prevQuestion()">⬅ Previous</button>
+                <div id="spacer-prev" style="flex:1;"></div>
+                <button id="btn-next" class="btn btn-primary" style="padding: 12px 35px; display: none;"
+                    onclick="nextQuestion()">Next Question ➔</button>
+            </div>
+        </div>
+
+        <!-- Final Results State -->
+        <div class="glass-card quiz-container animate-fade-in" id="results-ui"
+            style="display: none; text-align: center;">
+            <h1 class="neon-text" style="color: var(--primary); margin-bottom: 20px;">Validation Complete</h1>
+            <p class="text-secondary" style="font-size: 1.2rem; margin-bottom: 40px;">Your knowledge test has been
+                scored and transmitted to your profile.</p>
+
+            <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 40px;">
+                <div style="background: rgba(0,0,0,0.2); padding: 30px; border-radius: 16px; min-width: 200px;">
+                    <div style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 10px;">Final Score</div>
+                    <div id="final-score" class="neon-text"
+                        style="font-size: 3.5rem; color: var(--success); font-weight: bold;">0%</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.2); padding: 30px; border-radius: 16px; min-width: 200px;">
+                    <div style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 10px;">Correct Answers
+                    </div>
+                    <div id="correct-count" style="font-size: 3.5rem; color: var(--primary); font-weight: bold;">0/10
+                    </div>
+                </div>
+            </div>
+
+            <div id="review-container"
+                style="text-align: left; margin-bottom: 40px; max-height: 400px; overflow-y: auto; padding-right: 15px;">
+                <h3 style="margin-bottom: 20px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">
+                    Review Explanations</h3>
+                <!-- Explanations render here -->
+            </div>
+
+            <button class="btn btn-primary" style="padding: 15px 40px; font-size: 1.2rem;"
+                onclick="window.location.href='student-dashboard.html'">Return to Dashboard</button>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        Auth.requireAuth(['student']);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const moduleId = urlParams.get('id');
+
+        let questions = [];
+        let currentIndex = 0;
+        let userAnswers = {}; // { quiz_id: "A" }
+        let selectedOption = null;
+
+        let timeLeft = 600; // 10 minutes
+        let timerInterval;
+
+        async function fetchQuiz() {
+            if (!moduleId) {
+                alert("No module selected");
+                window.location.href = 'student-dashboard.html';
+                return;
+            }
+
+            try {
+                questions = await api.get(`/modules/${moduleId}/quiz`);
+                if (questions.length === 0) {
+                    document.getElementById('question-text').innerText = "No quiz available for this module.";
+                    return;
+                }
+
+                startTimer();
+                renderQuestion();
+
+            } catch (err) {
+                console.error("Failed to fetch quizzes", err);
+                document.getElementById('question-text').innerText = "Error loading quiz data.";
+            }
+        }
+
+        function renderQuestion() {
+            if (currentIndex >= questions.length) {
+                submitQuiz();
+                return;
+            }
+
+            const q = questions[currentIndex];
+            document.getElementById('question-counter').innerText = `Question ${currentIndex + 1} / ${questions.length}`;
+            document.getElementById('progress-fill').style.width = `${(currentIndex / questions.length) * 100}%`;
+            document.getElementById('question-text').innerText = q.question;
+
+            const optsContainer = document.getElementById('options-container');
+            optsContainer.innerHTML = '';
+
+            const options = [
+                { id: 'A', text: q.option_a },
+                { id: 'B', text: q.option_b },
+                { id: 'C', text: q.option_c },
+                { id: 'D', text: q.option_d }
+            ];
+
+            const prevAnswer = userAnswers[q.id];
+
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                if (prevAnswer === opt.id) {
+                    btn.classList.add('selected');
+                    selectedOption = opt.id;
+                }
+                btn.innerHTML = `<strong style="margin-right:15px; color:var(--primary);">${opt.id}.</strong> ${opt.text}`;
+                btn.onclick = () => selectOption(btn, opt.id, q.id);
+                optsContainer.appendChild(btn);
+            });
+
+            // Handle Previous Button Visibility
+            const prevBtn = document.getElementById('btn-prev');
+            const spacerPrev = document.getElementById('spacer-prev');
+            if (currentIndex > 0) {
+                prevBtn.style.display = 'block';
+                spacerPrev.style.display = 'none';
+            } else {
+                prevBtn.style.display = 'none';
+                spacerPrev.style.display = 'block';
+            }
+
+            // Handle Next Button Visibility
+            const nextBtn = document.getElementById('btn-next');
+            if (prevAnswer) {
+                nextBtn.style.display = 'block';
+                nextBtn.innerText = currentIndex === questions.length - 1 ? "Submit Validation ➔" : "Next Question ➔";
+            } else {
+                nextBtn.style.display = 'none';
+                selectedOption = null;
+            }
+        }
+
+        function selectOption(btnElement, answerValue, questionId) {
+            // Deselect others
+            const buttons = document.querySelectorAll('.option-btn');
+            buttons.forEach(b => b.classList.remove('selected'));
+
+            // Select this one
+            btnElement.classList.add('selected');
+            selectedOption = answerValue;
+            userAnswers[questionId] = answerValue;
+
+            // Show next button
+            const nextBtn = document.getElementById('btn-next');
+            nextBtn.style.display = 'block';
+            nextBtn.innerText = currentIndex === questions.length - 1 ? "Submit Validation ➔" : "Next Question ➔";
+        }
+
+        function nextQuestion() {
+            if (!selectedOption) return;
+            currentIndex++;
+            renderQuestion();
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderQuestion();
+            }
+        }
+
+        async function submitQuiz() {
+            clearInterval(timerInterval);
+            document.getElementById('quiz-ui').style.display = 'none';
+
+            try {
+                const res = await api.post('/quiz/submit', {
+                    module_id: moduleId,
+                    answers: userAnswers
+                });
+
+                document.getElementById('results-ui').style.display = 'block';
+
+                // Trigger real-time dashboard UI update without a page reload if user has another tab open
+                try {
+                    const updateChannel = new BroadcastChannel('medar_updates');
+                    updateChannel.postMessage({ type: 'MODULE_COMPLETED' });
+                } catch (e) { console.error("Broadcast failed", e); }
+
+                const finalScore = res.score;
+                const scoreIndicator = document.getElementById('final-score');
+                scoreIndicator.innerText = `${finalScore}%`;
+
+                if (finalScore < 60) {
+                    scoreIndicator.style.color = 'var(--danger)';
+                } else if (finalScore < 80) {
+                    scoreIndicator.style.color = 'var(--warning)';
+                }
+
+                document.getElementById('correct-count').innerText = `${res.correct_count} / ${res.total}`;
+
+                // Render Explanations
+                const revContainer = document.getElementById('review-container');
+                res.results.forEach((r, idx) => {
+                    const qObj = questions.find(q => q.id === r.quiz_id);
+                    const isCorr = r.is_correct;
+                    const color = isCorr ? 'var(--success)' : 'var(--danger)';
+                    const icon = isCorr ? '✅' : '❌';
+
+                    revContainer.innerHTML += `
+                        <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid ${color};">
+                            <h4 style="margin-bottom: 10px;">${idx + 1}. ${qObj.question}</h4>
+                            <div style="margin-bottom: 5px;">Your Answer: <strong style="color: ${color}">${r.student_answer || 'None'}</strong> ${icon}</div>
+                            ${!isCorr ? `<div style="margin-bottom: 10px;">Correct Answer: <strong style="color: var(--success);">${r.correct_answer}</strong></div>` : ''}
+                            <div style="color: var(--text-secondary); font-size: 0.95rem;"><i>Explanation:</i> ${r.explanation}</div>
+                        </div>
+                    `;
+                });
+
+            } catch (err) {
+                console.error("Submit error", err);
+                alert("Error submitting quiz. Please try again.");
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    submitQuiz();
+                    return;
+                }
+                timeLeft--;
+                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                const s = (timeLeft % 60).toString().padStart(2, '0');
+                const timerEl = document.getElementById('timer');
+                timerEl.innerText = `${m}:${s}`;
+
+                if (timeLeft < 60) {
+                    timerEl.style.color = 'var(--danger)';
+                    timerEl.classList.add('animate-fade-in'); // simple pulse
+                }
+            }, 1000);
+        }
+
+        // Start
+        fetchQuiz();
+    </script>
+</body>
+
+</html>

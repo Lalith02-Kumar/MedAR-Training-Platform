@@ -1,0 +1,82 @@
+[
+  {
+    "Field": "id",
+    "Type": "int",
+    "Null": "NO",
+    "Key": "PRI",
+    "Default": null,
+    "Extra": "auto_increment"
+  },
+  {
+    "Field": "title",
+    "Type": "varchar(255)",
+    "Null": "NO",
+    "Key": "",
+    "Default": null,
+    "Extra": ""
+  },
+  {
+    "Field": "description",
+    "Type": "text",
+    "Null": "YES",
+    "Key": "",
+    "Default": null,
+    "Extra": ""
+  },
+  {
+    "Field": "difficulty",
+    "Type": "enum('beginner','intermediate','advanced')",
+    "Null": "YES",
+    "Key": "",
+    "Default": "beginner",
+    "Extra": ""
+  },
+  {
+    "Field": "model_url",
+    "Type": "varchar(500)",
+    "Null": "NO",
+    "Key": "",
+    "Default": null,
+    "Extra": ""
+  },
+  {
+    "Field": "video_url",
+    "Type": "varchar(500)",
+    "Null": "YES",
+    "Key": "",
+    "Default": null,
+    "Extra": ""
+  },
+  {
+    "Field": "estimated_time",
+    "Type": "int",
+    "Null": "YES",
+    "Key": "",
+    "Default": "10",
+    "Extra": ""
+  },
+  {
+    "Field": "skill_level",
+    "Type": "varchar(100)",
+    "Null": "YES",
+    "Key": "",
+    "Default": "Novice",
+    "Extra": ""
+  },
+  {
+    "Field": "created_by",
+    "Type": "int",
+    "Null": "YES",
+    "Key": "MUL",
+    "Default": "1",
+    "Extra": ""
+  },
+  {
+    "Field": "created_at",
+    "Type": "timestamp",
+    "Null": "YES",
+    "Key": "",
+    "Default": "CURRENT_TIMESTAMP",
+    "Extra": "DEFAULT_GENERATED"
+  }
+]

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AR Training Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Include Post-Processing modules -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- EffectComposer dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #ar-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .hud {
+            position: absolute;
+            z-index: 10;
+            padding: 20px;
+            pointer-events: none;
+        }
+
+        .top-bar {
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .timer {
+            font-size: 2rem;
+            font-family: var(--font-heading);
+            font-weight: bold;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(154, 228, 203, 0.5);
+        }
+
+        .instructions-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 450px;
+            pointer-events: auto;
+            background: rgba(15, 23, 42, 0.85);
+            border-left: 4px solid var(--primary);
+        }
+
+        /* Tool Panel overrides */
+        .tool-panel {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: auto;
+            background: rgba(30, 41, 59, 0.6);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(8px);
+        }
+
+        .tool-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:hover {
+            background: var(--primary);
+            transform: scale(1.1);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .btn-interact {
+            pointer-events: auto;
+        }
+
+        /* Modal Overlay */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            background: var(--surface);
+            margin: 10% auto;
+            padding: 40px;
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(154, 228, 203, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ar-container"></div>
+
+    <div class="hud top-bar">
+        <div class="glass-card text-center btn-interact" style="padding: 10px 20px; border-radius: 30px;">
+            <h3 id="module-title" style="margin: 0; font-size: 1.2rem;" class="neon-text">Initializing Simulator...</h3>
+            <button class="btn btn-outline" style="padding: 5px 15px; margin-top: 10px; font-size: 0.85rem;"
+                onclick="window.location.href='student-dashboard.html'">Abort Procedure</button>
+        </div>
+        <div class="glass-card text-center" style="padding: 10px 30px; border-radius: 30px;">
+            <div class="timer" id="timer">00:00</div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="hud tool-panel">
+        <button class="tool-btn" onclick="resetView()" title="Reset Camera">🔄</button>
+        <button class="tool-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+        <button class="tool-btn" onclick="togglePulse()" title="Toggle Pulse">❤️</button>
+    </div>
+
+    <div class="hud instructions-panel glass-card text-center">
+        <h4 style="color: var(--primary); margin-bottom: 5px;">Surgical Objective</h4>
+        <p class="text-secondary" style="font-size: 0.95rem; margin-bottom: 20px;">Use drag to rotate, scroll to zoom.
+            Locate and excise the highlighted pathological node by clicking it.</p>
+        <button class="btn btn-primary btn-interact" id="btn-submit" onclick="submitSimulation()"
+            style="width: 100%; font-size: 1.1rem;" disabled>Complete Procedure</button>
+    </div>
+
+    <!-- Results Modal -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content animate-fade-in">
+            <h2 style="color: var(--primary); margin-bottom: 10px;">Procedure Analysis</h2>
+            <p class="text-secondary" style="margin-bottom: 30px;">AI Performance Validation Complete</p>
+
+            <div
+                style="display: flex; justify-content: space-around; margin-bottom: 30px; font-size: 1.5rem; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 12px;">
+                <div>Score <br><strong id="res-score" class="neon-text"
+                        style="color: var(--success); font-size: 2.5rem;">--</strong></div>
+                <div>Accuracy <br><strong id="res-accuracy" class="neon-text"
+                        style="color: var(--primary); font-size: 2.5rem;">--</strong></div>
+            </div>
+
+            <p id="res-feedback" style="margin-bottom: 20px; font-style: italic; font-size: 1.1rem; padding: 0 20px;">
+            </p>
+
+            <div
+                style="background: rgba(245, 158, 11, 0.1); padding: 20px; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.2); margin-bottom: 30px;">
+                <h4 style="color: var(--warning); text-align: left; margin-bottom: 15px;">AI Improvement Directives:
+                </h4>
+                <ul id="feedback-tips"
+                    style="padding-left: 20px; text-align: left; color: var(--text-primary); line-height: 1.8;"></ul>
+            </div>
+
+            <button class="btn btn-primary" style="padding: 15px 30px; font-size: 1.1rem; width: 100%;"
+                onclick="proceedToQuiz()">Proceed to Knowledge Validation ➔</button>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        Auth.requireAuth(['student']);
+
+        // State
+        let seconds = 0;
+        let timerInterval;
+        let moduleId = new URLSearchParams(window.location.search).get('id');
+        let stepsCompleted = 0;
+        let isPulsing = true;
+        let targetMesh, targetNode, controls;
+
+        // Audio Context Setup
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playBeep(success = true) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.type = success ? 'sine' : 'sawtooth';
+            osc.frequency.setValueAtTime(success ? 880 : 300, audioCtx.currentTime); // A5 or lower
+            if (success) osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
+
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // Init Scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x040812); // Deep blue-black medical gradient effect
+        scene.fog = new THREE.FogExp2(0x040812, 0.04);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.5, 9); // Pulled further back to decrease on-screen size
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2 for performance scaling
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.VSMShadowMap; // Softer, more realistic shadows
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.8; // Lowered significantly from 1.35 to prevent blowout
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        document.getElementById('ar-container').appendChild(renderer.domElement);
+
+        // Post-Processing for Cinematic Glare (Bloom)
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.15, 0.4, 0.9); // greatly reduced bloom strength
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // OrbitControls
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.02; // Slower, heavier camera inertia
+        controls.minDistance = 2.0;
+        controls.maxDistance = 15;
+
+        // Cinematic Surgical Lighting System (PBR ready)
+        const ambientLight = new THREE.AmbientLight(0xffeedd, 0.1); // Minimal warmth to deepest shadows
+        scene.add(ambientLight);
+
+        // Key Light - surgical lamp (warm white)
+        const keyLight = new THREE.SpotLight(0xfff5e6, 25); // Lowered from 60
+        keyLight.position.set(1, 7, 3);
+        keyLight.angle = Math.PI / 6;
+        keyLight.penumbra = 0.8; // Very soft edge
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.bias = -0.0001;
+        keyLight.shadow.blurSamples = 8;
+        keyLight.shadow.radius = 4;
+        scene.add(keyLight);
+
+        // Fill Light - cold ambient reflection (mimicking surgical room walls)
+        const fillLight = new THREE.DirectionalLight(0x77aaff, 0.8); // Lowered from 1.8
+        fillLight.position.set(-6, -1, 3);
+        scene.add(fillLight);
+
+        // Rim Light - intense surgical backlight for SSS translucency
+        const rimLight = new THREE.SpotLight(0xffffff, 35); // Lowered from 80
+        rimLight.position.set(3, 2, -6);
+        rimLight.angle = Math.PI / 4;
+        rimLight.penumbra = 0.5;
+        scene.add(rimLight);
+
+        // Procedural Tissue Bump Map Generation (Deep Vein + Surface Noise)
+        function createTissueBumpMap() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.createImageData(1024, 1024);
+
+            // Generate Worley-like cellular noise for organic tissue + veins
+            for (let y = 0; y < 1024; y++) {
+                for (let x = 0; x < 1024; x++) {
+                    const i = (y * 1024 + x) * 4;
+                    // Primary coarse noise
+                    let val = (Math.sin(x * 0.05) + Math.cos(y * 0.05)) * 50 + 100;
+                    // Secondary fine grain noise
+                    val += (Math.random() * 40 - 20);
+                    // Tertiary organic streaks (vascular)
+                    val -= Math.abs(Math.sin((x + y) * 0.02)) * 30;
+
+                    val = Math.max(0, Math.min(255, val));
+                    imgData.data[i] = val;
+                    imgData.data[i + 1] = val;
+                    imgData.data[i + 2] = val;
+                    imgData.data[i + 3] = 255;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(2, 2);
+            return tex;
+        }
+
+        const bumpTex = createTissueBumpMap();
+
+        // Procedural Organic Deformation (Smooth biological topology)
+        function deformGeometry(geometry, amp, freq) {
+            const posAttr = geometry.attributes.position;
+            const vec = new THREE.Vector3();
+            for (let i = 0; i < posAttr.count; i++) {
+                vec.fromBufferAttribute(posAttr, i);
+                const noise = Math.sin(vec.x * freq) * Math.cos(vec.y * freq) * Math.sin(vec.z * freq);
+                vec.add(vec.clone().normalize().multiplyScalar(noise * amp));
+                posAttr.setXYZ(i, vec.x, vec.y, vec.z);
+            }
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        // Advanced Medical Mesh Creation based on Module ID
+        let geometry, material;
+        const modIdNum = parseInt(moduleId || '1');
+
+        // PBR Core Material Parameters (Subsurface Scattering approximation + Clearcoat)
+        const basePhysicalParams = {
+            roughness: 0.18, // Slicker, wetter surface
+            metalness: 0.05,
+            transmission: 0.75, // Deep SSS effect for fleshy translucency
+            thickness: 2.5, // Volume thickness for light scattering
+            clearcoat: 0.9, // Very wet high-gloss organ look
+            clearcoatRoughness: 0.15,
+            bumpMap: bumpTex,
+            bumpScale: 0.025, // Deepen the vascular channels
+            ior: 1.45, // Index of refraction of biological tissue/water
+            envMapIntensity: 1.0
+        };
+
+        if (modIdNum <= 5) {
+            geometry = deformGeometry(new THREE.SphereGeometry(1.6, 256, 256), 0.18, 3.5);
+            material = new THREE.MeshPhysicalMaterial({ ...basePhysicalParams, color: 0x881111, emissive: 0x110000 });
+            targetNode = new THREE.Mesh(
+                deformGeometry(new THREE.DodecahedronGeometry(0.35, 6), 0.1, 12),
+                new THREE.MeshPhysicalMaterial({ ...basePhysicalParams, color: 0x05051a, emissive: 0x010311, transmission: 0.9, thickness: 0.5, roughness: 0.35 })
+            );
+            targetNode.position.set(1.3, 0.4, 1.2);
+        } else if (modIdNum <= 10) {
+            geometry = deformGeometry(new THREE.TorusGeometry(1.3, 0.55, 128, 256), 0.12, 4.5);
+            material = new THREE.MeshPhysicalMaterial({ ...basePhysicalParams, color: 0x6b2a2a, emissive: 0x150505 });
+            targetNode = new THREE.Mesh(
+                deformGeometry(new THREE.DodecahedronGeometry(0.35, 6), 0.1, 12),
+                new THREE.MeshPhysicalMaterial({ ...basePhysicalParams, color: 0x052211, emissive: 0x011105, transmission: 0.85, thickness: 0.6 })
+            );
+            targetNode.position.set(1.6, 0.8, 0.2);
+        } else {
+            geometry = deformGeometry(new THREE.TorusKnotGeometry(1.1, 0.45, 300, 80), 0.09, 7);
+            material = new THREE.MeshPhysicalMaterial({ ...basePhysicalParams, color: 0x550a11, emissive: 0x1a0000 });
+            targetNode = new THREE.Mesh(
+                deformGeometry(new THREE.DodecahedronGeometry(0.4, 6), 0.12, 10),
+                new THREE.MeshPhysicalMaterial({ ...basePhysicalParams, color: 0x884405, emissive: 0x1a0b00, transmission: 0.8, thickness: 0.8 })
+            );
+            targetNode.position.set(1.7, 0.9, 0.9);
+        }
+
+        targetMesh = new THREE.Mesh(geometry, material);
+        targetMesh.castShadow = true;
+        targetMesh.receiveShadow = true;
+        scene.add(targetMesh);
+
+        targetNode.castShadow = true;
+        scene.add(targetNode);
+
+        // Animation Loop
+        let timeCount = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            timeCount += 0.08; // Sped up node orbiting further
+
+            // Faster, smooth biological rotation
+            targetMesh.rotation.y += 0.0030;
+            targetMesh.rotation.x += 0.0016;
+
+            // Orbit the target node to make it slightly challenging
+            targetNode.position.x = Math.sin(timeCount * 0.1) * 2.5;
+            targetNode.position.y = Math.cos(timeCount * 0.06) * 1.5;
+            targetNode.position.z = Math.cos(timeCount * 0.1) * 2.5;
+            targetNode.rotation.y += 0.015;
+
+            // Pulse animation
+            if (isPulsing) {
+                const scale = 1 + Math.sin(timeCount * 4) * 0.015; // More subtle cardiovascular pulse
+                targetMesh.scale.set(scale, scale, scale);
+            } else {
+                targetMesh.scale.set(1, 1, 1);
+            }
+
+            // Route render through composer for Bloom effect
+            composer.render();
+        }
+        animate();
+
+        // Interaction (Raycasting)
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', (event) => {
+            // Ignore clicks on HUD
+            if (event.target.tagName === 'BUTTON' || event.target.closest('.hud')) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects([targetNode, targetMesh]);
+            if (intersects.length > 0) {
+                if (intersects[0].object === targetNode) {
+                    // Success Hit
+                    playBeep(true);
+
+                    // Cinematic Excision/Dissolve Animation
+                    let excisionProgress = 0;
+                    targetNode.material.transparent = true;
+
+                    const excisionAnim = setInterval(() => {
+                        excisionProgress += 0.04;
+                        if (excisionProgress > 1) excisionProgress = 1;
+
+                        const s = 1 + (excisionProgress * 0.15); // micro glow swell
+                        targetNode.scale.set(s, s, s);
+                        targetNode.material.opacity = 1 - excisionProgress;
+
+                        if (excisionProgress < 0.5) {
+                            targetNode.material.emissive.setHex(0x10b981);
+                            targetNode.material.emissiveIntensity = excisionProgress * 2;
+                        }
+
+                        if (excisionProgress === 1) {
+                            clearInterval(excisionAnim);
+                            targetNode.visible = false;
+                        }
+                    }, 30);
+
+                    stepsCompleted = 1;
+                    const subBtn = document.getElementById('btn-submit');
+                    subBtn.disabled = false;
+
+                    if (modIdNum <= 5) {
+                        subBtn.innerText = "Basic Structure Identified - Complete";
+                    } else if (modIdNum <= 10) {
+                        subBtn.innerText = "Diagnosis Confirmed - Complete";
+                    } else {
+                        subBtn.innerText = "Target Pathogen Excised - Complete Procedures";
+                    }
+
+                    subBtn.classList.add('animate-fade-in');
+                } else {
+                    // Miss hit (hit organ instead of tumor)
+                    playBeep(false);
+                    targetMesh.material.emissive.setHex(0x550000); // Flash red
+                    setTimeout(() => targetMesh.material.emissive.setHex(0x220000), 200);
+                }
+            }
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight); // Update Composer sizing
+        });
+
+        // UI Tool Functions
+        function resetView() {
+            camera.position.set(0, 2, 8);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function togglePulse() {
+            isPulsing = !isPulsing;
+        }
+
+        // Timer
+        timerInterval = setInterval(() => {
+            seconds++;
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${m}:${s}`;
+        }, 1000);
+
+        // Fetch Module Details
+        async function initModule() {
+            try {
+                if (!moduleId) throw new Error("No ID");
+                const mod = await api.get(`/modules/${moduleId}`);
+                document.getElementById('module-title').innerText = mod.title;
+            } catch (e) {
+                document.getElementById('module-title').innerText = "Anatomical Surgery Sim";
+            }
+        }
+        initModule();
+
+        // Submit Simulation to Backend
+        async function submitSimulation() {
+            clearInterval(timerInterval);
+            isPulsing = false;
+
+            try {
+                // 1. Get AI feedback
+                const aiRes = await api.post('/ai-feedback', {
+                    timeTaken: seconds,
+                    stepsCompleted: stepsCompleted,
+                    totalSteps: 1
+                });
+
+                // 2. Save Performance
+                if (moduleId) {
+                    await api.post('/performance', {
+                        module_id: moduleId,
+                        score: aiRes.score,
+                        accuracy: aiRes.accuracy,
+                        time_taken: seconds,
+                        feedback: aiRes.feedback
+                    });
+
+                    try {
+                        const updateChannel = new BroadcastChannel('medar_updates');
+                        updateChannel.postMessage({ type: 'MODULE_COMPLETED' });
+                    } catch (e) { console.error("Broadcast failed", e); }
+                }
+
+                // 3. Show Modal
+                document.getElementById('res-score').innerText = aiRes.score + '%';
+                document.getElementById('res-accuracy').innerText = aiRes.accuracy + '%';
+                document.getElementById('res-feedback').innerText = `"${aiRes.feedback}"`;
+
+                const ul = document.getElementById('feedback-tips');
+                ul.innerHTML = '';
+                aiRes.improvement_tips.forEach(tip => {
+                    ul.innerHTML += `<li>• ${tip}</li>`;
+                });
+
+                document.getElementById('resultModal').style.display = 'block';
+
+            } catch (error) {
+                alert("Error compiling telemetry data: " + error.message);
+            }
+        }
+
+        // Route to Quiz
+        function proceedToQuiz() {
+            window.location.href = `quiz?id=${moduleId || 1}`;
+        }
+    </script>
+</body>
+
+</html>

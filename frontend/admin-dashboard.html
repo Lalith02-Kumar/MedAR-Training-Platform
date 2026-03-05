@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - MedAR Trainer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/profile-system.js"></script>
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .data-card {
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        th {
+            color: var(--primary);
+            font-family: var(--font-heading);
+        }
+
+        .role-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .role-student {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .role-instructor {
+            background: rgba(58, 123, 213, 0.2);
+            color: var(--primary);
+        }
+
+        .role-admin {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar glass-panel">
+        <div class="container d-flex justify-between align-center">
+            <a href="#" class="nav-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                MedAR Systems Admin
+            </a>
+            <div class="nav-links">
+                <span id="user-greeting" style="font-weight: 500;"></span>
+                <button class="btn btn-outline" onclick="Auth.logout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Analytics Overview -->
+        <div class="glass-panel"
+            style="margin-top: 30px; padding: 20px; display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <h3 style="color:var(--text-secondary)">Platform Users</h3>
+                <h1 id="stat-students">--</h1>
+            </div>
+            <div>
+                <h3 style="color:var(--text-secondary)">Active Modules</h3>
+                <h1 id="stat-modules">--</h1>
+            </div>
+            <div>
+                <h3 style="color:var(--text-secondary)">Avg Accuracy</h3>
+                <h1 id="stat-score" style="color:var(--success)">--%</h1>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+            <!-- User Management -->
+            <div class="data-card glass-panel">
+                <h2 style="color: var(--primary);">User Management</h2>
+                <input type="text" id="user-search" class="form-control" placeholder="Search users by name or email..."
+                    oninput="filterUsersTable()"
+                    style="margin-top: 15px; margin-bottom: 15px; background: var(--surface); width: 100%; border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px;">
+                <hr style="border-color: var(--glass-border); margin: 15px 0;">
+
+                <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-body">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Scripts already included in head -->
+
+    <script>
+        const user = Auth.requireAuth(['admin']);
+        document.getElementById('user-greeting').innerText = `Admin: ${user.name}`;
+
+        async function loadDashboard() {
+            try {
+                // Get Analytics
+                const stats = await api.get('/performance/overview/analytics');
+                document.getElementById('stat-students').innerText = stats.total_students;
+                document.getElementById('stat-modules').innerText = stats.total_modules;
+                document.getElementById('stat-score').innerText = stats.avg_network_score + '%';
+
+                // Get Users
+                const users = await api.get('/admin/users');
+                const tbody = document.getElementById('users-body');
+                tbody.innerHTML = '';
+
+                users.forEach(u => {
+                    const date = new Date(u.created_at).toLocaleDateString();
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>#${u.id}</td>
+                            <td><strong>${u.name}</strong></td>
+                            <td class="text-secondary">${u.email}</td>
+                            <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+                            <td class="text-secondary">${date}</td>
+                            <td>
+                                ${u.id !== user.id ? `<button class="btn btn-outline btn-sm" onclick="deleteUser(${u.id})" style="color:var(--danger); border-color:var(--danger)">Revoke</button>` : `<span class="text-secondary" style="font-size:0.8rem">Current</span>`}
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error("Dashboard Load Error:", error);
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm("Are you sure you want to revoke this user? All their progress will be permanently deleted.")) return;
+
+            try {
+                await api.delete(`/admin/users/${id}`);
+                alert("User access revoked successfully.");
+                loadDashboard();
+            } catch (e) {
+                alert("Error revoking user: " + e.message);
+            }
+        }
+
+        function filterUsersTable() {
+            const query = document.getElementById('user-search').value.toLowerCase();
+            const rows = document.querySelectorAll('#users-body tr');
+            rows.forEach(row => {
+                const nameNode = row.cells[1].querySelector('strong');
+                const name = nameNode ? nameNode.innerText.toLowerCase() : '';
+                const email = row.cells[2].innerText.toLowerCase();
+                row.style.display = (name.includes(query) || email.includes(query)) ? '' : 'none';
+            });
+        }
+
+        loadDashboard();
+    </script>
+</body>
+
+</html>

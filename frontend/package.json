@@ -1,0 +1,16 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "description": "MedAR Trainer Frontend",
+  "main": "index.js",
+  "scripts": {
+    "dev": "serve -n -l 3000"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "serve": "^14.2.5"
+  }
+}

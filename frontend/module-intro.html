@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module Introduction - MedAR Trainer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav class="navbar glass-panel">
+        <div class="container d-flex justify-between align-center">
+            <a href="student-dashboard.html" class="nav-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Dashboard
+            </a>
+            <div class="nav-links">
+                <span id="user-greeting" style="font-weight: 500;"></span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container" style="margin-top: 40px; margin-bottom: 60px;">
+        <div class="glass-card animate-fade-in" style="max-width: 900px; margin: 0 auto; text-align: center;">
+            <span id="mod-diff" class="badge" style="margin-bottom: 20px;"></span>
+            <h1 id="mod-title" class="neon-text" style="color: var(--primary); margin-bottom: 15px; font-size: 2.5rem;">
+                Loading Module...</h1>
+            <p id="mod-desc" class="text-secondary"
+                style="font-size: 1.1rem; max-width: 700px; margin: 0 auto 30px auto;"></p>
+
+            <div class="d-flex justify-between"
+                style="max-width: 400px; margin: 0 auto 30px auto; color: var(--primary);">
+                <span id="mod-time">⏱️ -- min</span>
+                <span id="mod-skill">🎯 --</span>
+            </div>
+
+            <!-- Video Embed Container -->
+            <div class="video-container"
+                style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 12px; border: 1px solid var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <iframe id="video-embed"
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" src=""
+                    title="Educational Video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
+            </div>
+
+            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--glass-border);">
+                <h3 style="margin-bottom: 20px;">Ready for the 3D Simulation?</h3>
+                <a id="btn-start-ar" href="#" class="btn btn-primary"
+                    style="font-size: 1.2rem; padding: 15px 40px; border-radius: 30px;">
+                    ▶ Enter AR Training
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        const user = Auth.requireAuth(['student']);
+        document.getElementById('user-greeting').innerText = `Hello, ${user.name}`;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const moduleId = urlParams.get('id');
+
+        if (!moduleId) {
+            window.location.href = 'student-dashboard';
+        }
+
+        async function loadModuleDetails() {
+            if (!moduleId) return;
+
+            function getYouTubeEmbedUrl(url) {
+                if (!url) return '';
+                // Handle standard watch URLs
+                let videoId = '';
+                if (url.includes('youtube.com/watch?v=')) {
+                    videoId = url.split('v=')[1].split('&')[0];
+                }
+                // Handle short URLs (youtu.be)
+                else if (url.includes('youtu.be/')) {
+                    videoId = url.split('youtu.be/')[1].split('?')[0];
+                }
+                // Handle already formatted embed URLs
+                else if (url.includes('youtube.com/embed/')) {
+                    return url;
+                }
+
+                return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+            }
+
+            try {
+                const mod = await api.get(`/modules/${moduleId}`);
+
+                document.getElementById('mod-title').innerText = mod.title;
+                document.getElementById('mod-desc').innerText = mod.description;
+                document.getElementById('mod-time').innerText = `⏱️ ${mod.estimated_time} min`;
+                document.getElementById('mod-skill').innerText = `🎯 ${mod.skill_level}`;
+
+                const badge = document.getElementById('mod-diff');
+                badge.innerText = mod.difficulty.toUpperCase();
+                badge.className = `badge badge-${mod.difficulty}`;
+
+                const videoIframe = document.getElementById('video-embed');
+                if (mod.video_url) {
+                    videoIframe.src = getYouTubeEmbedUrl(mod.video_url);
+                } else {
+                    videoIframe.parentElement.style.display = 'none'; // Hide if no video
+                }
+
+                document.getElementById('btn-start-ar').href = `ar-training?id=${mod.id}`;
+
+            } catch (err) {
+                console.error('Failed to load module details', err);
+                alert('Module not found or server error');
+                window.location.href = 'student-dashboard';
+            }
+        }
+
+        loadModuleDetails();
+    </script>
+</body>
+
+</html>
